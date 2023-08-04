@@ -4,12 +4,6 @@
 
 package io.airbyte.workers.sync;
 
-import static io.airbyte.config.EnvConfigs.SOCAT_KUBE_CPU_LIMIT;
-import static io.airbyte.config.EnvConfigs.SOCAT_KUBE_CPU_REQUEST;
-import static io.airbyte.metrics.lib.ApmTraceConstants.Tags.PROCESS_EXIT_VALUE_KEY;
-import static io.airbyte.metrics.lib.ApmTraceConstants.WORKER_OPERATION_NAME;
-import static io.airbyte.workers.process.Metadata.CONNECTION_ID_LABEL_KEY;
-
 import com.google.common.base.Stopwatch;
 import datadog.trace.api.Trace;
 import io.airbyte.commons.constants.WorkerConstants;
@@ -28,17 +22,16 @@ import io.airbyte.workers.ContainerOrchestratorConfig;
 import io.airbyte.workers.Worker;
 import io.airbyte.workers.WorkerConfigs;
 import io.airbyte.workers.exception.WorkerException;
-import io.airbyte.workers.process.AsyncKubePodStatus;
-import io.airbyte.workers.process.AsyncOrchestratorPodProcess;
-import io.airbyte.workers.process.KubeContainerInfo;
-import io.airbyte.workers.process.KubePodInfo;
-import io.airbyte.workers.process.KubePodResourceHelper;
-import io.airbyte.workers.process.KubeProcessFactory;
+import io.airbyte.workers.process.*;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.micronaut.core.util.StringUtils;
 import io.temporal.activity.ActivityExecutionContext;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
@@ -50,9 +43,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static io.airbyte.config.EnvConfigs.SOCAT_KUBE_CPU_LIMIT;
+import static io.airbyte.config.EnvConfigs.SOCAT_KUBE_CPU_REQUEST;
+import static io.airbyte.metrics.lib.ApmTraceConstants.Tags.PROCESS_EXIT_VALUE_KEY;
+import static io.airbyte.metrics.lib.ApmTraceConstants.WORKER_OPERATION_NAME;
+import static io.airbyte.workers.process.Metadata.CONNECTION_ID_LABEL_KEY;
 
 /**
  * Coordinates configuring and managing the state of an async process. This is tied to the (job_id,
@@ -138,7 +134,7 @@ public abstract class LauncherWorker<INPUT, OUTPUT> implements Worker<INPUT, OUT
       try {
         // Assemble configuration.
         final Map<String, String> envMap = System.getenv().entrySet().stream()
-            .filter(entry -> OrchestratorConstants.ENV_VARS_TO_TRANSFER.contains(entry.getKey()))
+            .filter(entry -> OrchestratorConstants.ENV_VARS_TO_TRANSFER.contains(entry.getKey()) || entry.getKey().startsWith("PRIMEDATA_SECRET_"))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         // Manually add the worker environment to the env var map
