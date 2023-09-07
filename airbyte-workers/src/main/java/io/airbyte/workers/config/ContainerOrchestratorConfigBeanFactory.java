@@ -144,6 +144,12 @@ public class ContainerOrchestratorConfigBeanFactory {
       environmentVariables.put(Environment.ENVIRONMENTS_ENV, System.getenv(Environment.ENVIRONMENTS_ENV));
     }
 
+    for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
+      if (entry.getKey().startsWith("PRIMEDATA_SECRET_")) {
+        environmentVariables.put(entry.getKey(), entry.getValue());
+      }
+    }
+
     environmentVariables.put(ACCEPTANCE_TEST_ENABLED_VAR, Boolean.toString(isInTestMode));
 
     return new ContainerOrchestratorConfig(
