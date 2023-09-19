@@ -27,12 +27,12 @@
             <PatternLayout pattern="${default-pattern}"/>
         </Console>
 
-        <Console name="SimpleDefault" target="SYSTEM_OUT">
-            <ContextMapFilter onMatch="ACCEPT" onMismatch="DENY">
-                <KeyValuePair key="simple" value="true"/>
-            </ContextMapFilter>
-            <PatternLayout pattern="${simple-pattern}"/>
-        </Console>
+<!--        <Console name="SimpleDefault" target="SYSTEM_OUT">-->
+<!--            <ContextMapFilter onMatch="ACCEPT" onMismatch="DENY">-->
+<!--                <KeyValuePair key="simple" value="true"/>-->
+<!--            </ContextMapFilter>-->
+<!--            <PatternLayout pattern="${simple-pattern}"/>-->
+<!--        </Console>-->
 
         <Rewrite name="SecretMaskRewrite">
             <MaskedDataInterceptor></MaskedDataInterceptor>
