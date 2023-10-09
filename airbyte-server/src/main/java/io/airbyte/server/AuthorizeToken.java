@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.html.HTMLHeadElement;
 
 
 /**
@@ -35,9 +36,12 @@ import org.slf4j.LoggerFactory;
 public class AuthorizeToken implements AuthenticationFetcher {
 
     private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final String AUTH_URL = "http://meta-router:8088/internal/auth";
+    private static final String AUTH_HEADER = "X-Airbyte-Analytic-Source";
+    private static final String WEBAPP = "webapp";
 
     private boolean checkToken(String token) throws IOException {
-        URL url = new URL("http://meta-router:8088/internal/auth");
+        URL url = new URL(AUTH_URL);
         String bearerToken = "Bearer " + token;
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
         con.setRequestProperty("Authorization", bearerToken);
@@ -46,32 +50,33 @@ public class AuthorizeToken implements AuthenticationFetcher {
         int status = con.getResponseCode();
         log.info("Status: " + status);
 
-        return status < 400;
+        return status >= 200 && status < 300;
     };
-
-    @Override
-    public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
-        String header = request.getHeaders().get("X-Airbyte-Analytic-Source");
-        if (header != null && header.equals("webapp")) {
-            Optional<Cookie> token = request.getCookies().findCookie("AB-Auth-Token");
-            if (token.isPresent()) {
-                try {
-                    if (checkToken(token.get().getValue())) {
-                        return Flux.create(emitter -> {
-                            emitter.next(Authentication.build("lav", AuthRole.buildAuthRolesSet(AuthRole.ADMIN)));
-                            emitter.complete();
-                        });
-                    }
-                } catch (IOException e) {
-                    log.error("Error: " + e.getMessage());
-                }
-            }
-            return Flux.empty();
-        }
-
+    
+    private Flux<Authentication> createAuthentication() {
         return Flux.create(emitter -> {
             emitter.next(Authentication.build("lav", AuthRole.buildAuthRolesSet(AuthRole.ADMIN)));
             emitter.complete();
         });
+    }
+
+    @Override
+    public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
+        String header = request.getHeaders().get(AUTH_HEADER);
+        if (WEBAPP.equals(header)) {
+            Optional<Cookie> token = request.getCookies().findCookie("AB-Auth-Token");
+            if (token.isPresent()) {
+                try {
+                    if (checkToken(token.get().getValue())){
+                        return createAuthentication();
+                    }
+                } catch (IOException e) {
+                    log.error("Error: " + e.getMessage());
+                    throw new RuntimeException(e);
+                }
+            }
+            return Flux.empty();
+        }
+        return createAuthentication();
     }
 }
