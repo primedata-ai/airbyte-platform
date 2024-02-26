@@ -13,7 +13,6 @@ import io.airbyte.commons.lang.Exceptions;
 import io.airbyte.commons.temporal.sync.OrchestratorConstants;
 import io.airbyte.commons.workers.config.WorkerConfigs;
 import io.airbyte.config.ResourceRequirements;
-import io.airbyte.featureflag.ConcurrentSocatResources;
 import io.airbyte.featureflag.Connection;
 import io.airbyte.featureflag.FeatureFlagClient;
 import io.airbyte.featureflag.UseCustomK8sScheduler;
@@ -133,15 +132,6 @@ public abstract class LauncherWorker<INPUT, OUTPUT> implements Worker<INPUT, OUT
       // Merge in the env from the ContainerOrchestratorConfig
       containerOrchestratorConfig.environmentVariables().entrySet().stream().forEach(e -> envMap.putIfAbsent(e.getKey(), e.getValue()));
 
-      // Allow for the override of the socat pod CPU resources as part of the concurrent source read
-      // experimentation
-      final String socatResources = featureFlagClient.stringVariation(ConcurrentSocatResources.INSTANCE, new Connection(connectionId));
-      if (StringUtils.isNotEmpty(socatResources)) {
-        LOGGER.info("Overriding Socat CPU limit and request to {}.", socatResources);
-        envMap.put(SOCAT_KUBE_CPU_LIMIT, socatResources);
-        envMap.put(SOCAT_KUBE_CPU_REQUEST, socatResources);
-      }
-
       final Map<String, String> fileMap = new HashMap<>(additionalFileMap);
       fileMap.putAll(Map.of(
           OrchestratorConstants.INIT_FILE_APPLICATION, application,
@@ -169,14 +159,12 @@ public abstract class LauncherWorker<INPUT, OUTPUT> implements Worker<INPUT, OUT
 
       final String schedulerName = featureFlagClient.stringVariation(UseCustomK8sScheduler.INSTANCE, new Connection(connectionId));
 
-      final String shortImageName =
-          mainContainerInfo.image() != null ? DockerImageNameHelper.extractShortImageName(mainContainerInfo.image()) : null;
       final var allLabels = KubeProcessFactory.getLabels(
           jobRunConfig.getJobId(),
           Math.toIntExact(jobRunConfig.getAttemptId()),
           connectionId,
           workspaceId,
-          shortImageName,
+          mainContainerInfo.image(),
           generateMetadataLabels(),
           Collections.emptyMap());
 
