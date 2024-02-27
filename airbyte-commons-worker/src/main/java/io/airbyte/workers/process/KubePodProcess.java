@@ -298,7 +298,10 @@ public class KubePodProcess implements KubePod {
             podDefinition.getMetadata().getName(), containerPath, INIT_CONTAINER_NAME);
         LOGGER.info(command);
 
-        proc = Runtime.getRuntime().exec(command);
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+        proc = pb.start();
         LOGGER.info("Waiting for kubectl cp to complete");
         final int exitCode = proc.waitFor();
 
